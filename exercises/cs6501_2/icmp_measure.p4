@@ -167,6 +167,7 @@ control MyIngress(inout headers hdr,
             // Ping echo request came in. 
             // 1. Write this packet's timestamp ("cur_time") to register "echo_reg".
             // Hint: one line should do.
+            // Hint: If stuck, check other excercises in the previous directory that use a register (e.g., link monitor)
             if (hdr.icmp.typeCode == 0x0800) {
                 ##### YOUR CODE HERE 1 - START #####
 
@@ -182,6 +183,7 @@ control MyIngress(inout headers hdr,
             //    3.1. Hint: IPv4 header's identification field is only 16 bits. But the diff is 48 bits. 
             //      Thus, you need to add a typecast in C style. E.g., "16bit_variable = (bit<16>) 48bit_variable"
             //  Hint: Just several lines should do.
+            //  Hint: If stuck, check other excercises in the previous directory that use a register (e.g., link monitor)
             else if (hdr.icmp.typeCode == 0x0000) {
                 ##### YOUR CODE HERE 2 - START #####
 
