@@ -30,6 +30,8 @@ header rps_t {
     // There are four fields, each with a specific bit size. 
     // You will use these field names later in your code.
     // Hint: You need four lines here (without comments)
+    // Don't use "error" or "switch" as field names. These are reserved terms. 
+    // Maybe use "err" or "sw" instead, or something like that.
 
     ##### YOUR CODE HERE 1 - END #####
 
