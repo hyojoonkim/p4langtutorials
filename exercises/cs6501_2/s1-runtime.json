@@ -1,0 +1,27 @@
+{
+  "target": "bmv2",
+  "p4info": "build/icmp_measure.p4.p4info.txt",
+  "bmv2_json": "build/icmp_measure.json",
+  "table_entries": [ 
+    {
+      "table": "MyIngress.forward_tbl",
+      "match": {
+        "hdr.ipv4.dstAddr": ["10.0.1.1"]
+      },
+      "action_name": "MyIngress.l2_forward",
+      "action_params": {
+        "port": 1
+      }
+    },
+    {
+      "table": "MyIngress.forward_tbl",
+      "match": {
+        "hdr.ipv4.dstAddr": ["10.0.1.2"]
+      },
+      "action_name": "MyIngress.l2_forward",
+      "action_params": {
+        "port": 2
+      }
+    }
+  ]
+}
