@@ -46,9 +46,11 @@ header icmp_t {
 struct metadata {
     bit<32> hash1;
     bit<32> hash2;
-    bit<48> diff;
-    bit<48> cur_time;
-    bit<48> last_time;
+}
+
+struct values_t {
+    bit<1> exist;
+    bit<9> interface;
 }
 
 struct headers {
@@ -110,99 +112,91 @@ control MyIngress(inout headers hdr,
                   inout standard_metadata_t standard_metadata) {
 
 
-    // Register for keeping timestamp
-    register<bit<48>>(MAX_FLOWS) echo_reg;
-
     action drop() {
-        mark_to_drop(standard_metadata);
+        standard_metadata.egress_spec = 0;
     }
 
-    action l2_forward(egressSpec_t port) {
-        standard_metadata.egress_spec = port;
-    }
-
-    table forward_tbl {
+    table firewall_table {
         key = {
-            hdr.ipv4.dstAddr: exact;
+            hdr.ipv4.dstAddr: lpm;
         }
         actions = {
-            l2_forward;
             drop;
             NoAction;
         }
         size = MAX_FLOWS;
-        default_action = drop();
+        default_action = NoAction;
     }
 
-    table debug {
-        key ={
-            meta.cur_time: exact;
-            meta.last_time: exact;
-        }
-        actions = {}
-    }
+    // Register, or in-switch hashtable, 
+    // for keeping the hash(MAC)--interface mapping.
+    register<bit<9>>(MAX_FLOWS) mac_intf_table;
 
     apply {
-        // Get this packet's timestamp when it entered the ingress pipeline
-        bit<48> cur_time = standard_metadata.ingress_global_timestamp;
 
-        bit<48> last_time;
-        bit<48> diff;
-        
-        // For debugging
-        meta.cur_time = cur_time;
+        if (hdr.ethernet.isValid()) {
 
-        if (hdr.icmp.isValid()) {
+            // The variable that will hold the switch interface number that was retreived 
+            // from the mac_inft_table in this switch.
+            // 0 means the packet will be dropped. That is the default behavior.
+            bit<9> intf_in_table = 0; 
 
-            // If this packet is from host 1, hash with fields ordered like: srcAddr, dstAddr
-            if (standard_metadata.ingress_port == 1) {
-                hash(meta.hash1, HashAlgorithm.crc32, (bit<16>)0, {hdr.ipv4.srcAddr, hdr.ipv4.dstAddr}, (bit<32>)MAX_FLOWS);
-            }
-            // Else, this packet is from host 2. Hash with fields ordered like: dstAddr, srcAddr
-            // We do this so that we can look up the right entry even when the packet's direction is the opposite.
-            else {
-                hash(meta.hash1, HashAlgorithm.crc32, (bit<16>)0, {hdr.ipv4.dstAddr, hdr.ipv4.srcAddr}, (bit<32>)MAX_FLOWS);
-            }
+            // variable meta.hash1 holds the hash result when (hdr.ethernet.srcAddr) is hashed by crc32.
+            // variable meta.hash2 holds the hash result when (hdr.ethernet.dstAddr) is hashed by crc32.
+            hash(meta.hash1, HashAlgorithm.crc32, (bit<16>)0, {hdr.ethernet.srcAddr}, (bit<32>)MAX_FLOWS);
+            hash(meta.hash2, HashAlgorithm.crc32, (bit<16>)0, {hdr.ethernet.dstAddr}, (bit<32>)MAX_FLOWS);
 
-            // Ping echo request came in. 
-            // 1. Write this packet's timestamp ("cur_time") to register "echo_reg".
-            // Hint: one line should do.
-            // Hint: If stuck, check other excercises in the previous directory that use a register (e.g., link monitor)
-            if (hdr.icmp.typeCode == 0x0800) {
-                ##### YOUR CODE HERE 1 - START #####
+            // Use either meta.hash1 or meta.hash2, depending on the situation, to read or write to the
+            // mac_inft_table. Basically, meta.hash1 and meta.hash2 are indices to the mac_inft_table. 
 
 
-                ##### YOUR CODE HERE 1 - END   #####
-            }
+            ##### YOUR CODE HERE - START #####
 
-            // Ping echo reply came in. 
-            //  1. You already know this packet's ingress timestamp.
-            //  2. Lookup the register for the matching echo request packet, read the timestamp from the register, then save to variable "last_time". 
-            //  3. Calculate time difference.
-            //  4. Overwrite the IPv4 header's identification field with this diff value.
-            //    3.1. Hint: IPv4 header's identification field is only 16 bits. But the diff is 48 bits. 
-            //      Thus, you need to add a typecast in C style. E.g., "16bit_variable = (bit<16>) 48bit_variable"
-            //  Hint: Just several lines should do.
-            //  Hint: If stuck, check other excercises in the previous directory that use a register (e.g., link monitor)
-            else if (hdr.icmp.typeCode == 0x0000) {
-                ##### YOUR CODE HERE 2 - START #####
+            // HINT:  You need less than 10 lines of code here.
+            //
+            // 1. First, take note of a MAC address of the packet and which interface the packet used 
+            // to enter the switch, and save this to the hash table, mac_intf_table.
+            //
+            // Should you use the source or destination MAC? 
+            // In other words, should use use meta.hash1 or meta.hash2 when finding an entry
+            // to save the information of the incoming interface for that MAC? 
+            // You should select the right one. 
+            //
+            // Hint: Recap on self-learning L2 switch, the class on Wed, March 27.
+            //   Note that we are not using ARP packets here though.
+            //
+            // Hint: the variable "standard_metadata.ingress_port" holds the interface number
+            // which the packet used to enter the switch. 
+            //
+            // Hint: If stuck, check other excercises in the previous directory that use a register (i.e., hashtable)
+            //       (e.g., link monitor)
+            //
+            // 2. Okay, information saved. Next, check if the switch knows where 
+            // this packet should go out (which interface to use) to reach its 
+            // destination based on the MAC address. 
+            //
+            // When looking up the hashtable, should you use meta.hash1 or meta.hash2? 
+            // You should select the right one. 
+            // 
+            // 3. Set the output port ("standard_metadata.egress_spec") 
+            // to the value you found in the hashtable. 
+            // The hashtable returns 0 if an entry is not found
+            // (and standard_metadata.egress_spec=0 
+            // means the packet is dropped).
+            
 
-
-                ##### YOUR CODE HERE 2 - END   #####
-
-                // for debugging
-                meta.last_time = last_time;
-            }
+            ##### YOUR CODE HERE - END   #####
         }
 
-        // Apply forwarding table so that packets are forwarded.
-        // This table is used for installing forwarding rules.
-        // If interested, look at "s1-runtime.json", which installs rules
-        //  in the table at startup.
-        forward_tbl.apply();
 
-        // For debugging
-        debug.apply();
+        // Apply the firewall match-action table
+        // ### Look at the "s1-runtime.json" file to 
+        // ### to learn what is installed in this match-action table.
+        // ### Also look at the "topology.json" file to learn the
+        // ### network topology and IP and MAC addresses assigned
+        // ### to each host
+        // ### Important for answering Quiz 3.
+        firewall_table.apply();
     }
 }
 
